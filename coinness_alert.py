@@ -19,7 +19,7 @@ import time
 import urllib.request
 from datetime import datetime, timedelta, timezone
 
-API_URL = "https://api.coinness.com/feed/v1/breaking-news?languageCode=ko&limit=50"
+API_URL = "https://api.coinness.com/feed/v1/breaking-news?languageCode=ko&limit=30"
 STATE_FILE = os.environ.get("STATE_FILE", "coinness_seen.json")
 POLL_SECONDS = 60
 # 상태 파일이 없을 때(첫 실행) 이 시간 이내 속보만 알림 (옛날 소식 폭탄 방지)
@@ -167,6 +167,8 @@ def main():
             save_seen(seen)
         except Exception as e:
             print(f"확인 실패: {e}", file=sys.stderr)
+            if "--once" in args:
+                sys.exit(1)  # 스케줄러에서 실패로 표시되도록
         if "--once" in args:
             break
         time.sleep(POLL_SECONDS)
