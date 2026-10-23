@@ -32,3 +32,7 @@ NTFY_TOPIC=coinness-pro-7x9k2q python3 coinness_alert.py
 ```
 
 Python 3.8+ 표준 라이브러리만 사용합니다. `python3 coinness_alert.py --test` 는 최근 속보 중 걸러지는 것만 출력합니다(알림 없음).
+
+## 알림 테스트
+
+Actions 탭 → coinness-alert → Run workflow 에서 **테스트 알림만 보내기**를 체크하고 실행하면 휴대폰에 테스트 알림이 1개 옵니다.
