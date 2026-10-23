@@ -10,6 +10,7 @@
   python3 coinness_alert.py          # 1분마다 계속 확인 (PC/서버에서 상시 실행)
   python3 coinness_alert.py --once   # 한 번만 확인 (GitHub Actions 등 스케줄러용)
   python3 coinness_alert.py --test   # 최근 속보로 필터 결과만 출력, 알림 안 보냄
+  python3 coinness_alert.py --ping   # 테스트 알림 1개 보내기
 """
 import json
 import os
@@ -159,6 +160,10 @@ def main():
         return
     if not (os.environ.get("NTFY_TOPIC") or os.environ.get("TELEGRAM_BOT_TOKEN")):
         sys.exit("NTFY_TOPIC 또는 TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID 환경변수를 설정하세요.")
+    if "--ping" in args:
+        notify({"id": "", "title": "코인니스 알림 연결 완료",
+                "content": "이 알림이 보이면 설정이 끝난 거예요. 앞으로 관심 코인과 상장폐지 속보만 옵니다."}, ["테스트"])
+        return
 
     seen = load_seen()
     while True:

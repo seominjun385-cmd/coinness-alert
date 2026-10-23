@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: "*/5 * * * *"   # 5분마다 (GitHub 사정에 따라 몇 분 늦어질 수 있음)
   workflow_dispatch:
+    inputs:
+      ping:
+        description: "테스트 알림만 보내기"
+        type: boolean
+        default: false
 
 concurrency:
   group: coinness-alert
@@ -27,7 +32,7 @@ jobs:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python3 coinness_alert.py --once
+        run: python3 coinness_alert.py ${{ inputs.ping && '--ping' || '--once' }}
 
       - name: 이미 본 소식 목록 저장
         if: always()
