@@ -1,0 +1,37 @@
+name: coinness-alert
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"   # 5분마다 (GitHub 사정에 따라 몇 분 늦어질 수 있음)
+  workflow_dispatch:
+
+concurrency:
+  group: coinness-alert
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 이미 본 소식 목록 불러오기
+        uses: actions/cache/restore@v4
+        with:
+          path: coinness_seen.json
+          key: coinness-seen-${{ github.run_id }}
+          restore-keys: coinness-seen-
+
+      - name: 속보 확인 및 알림
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python3 coinness_alert.py --once
+
+      - name: 이미 본 소식 목록 저장
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: coinness_seen.json
+          key: coinness-seen-${{ github.run_id }}
