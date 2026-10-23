@@ -1,0 +1,11 @@
+name: debug
+on: workflow_dispatch
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          for q in "limit=5" "limit=20" "limit=30" "limit=50"; do
+            echo "== $q"; curl -sS -A "Mozilla/5.0" "https://api.coinness.com/feed/v1/breaking-news?languageCode=ko&$q" | head -c 300; echo
+          done
+          echo "== with origin"; curl -sS -A "Mozilla/5.0" -H "Origin: https://coinness.com" -H "Referer: https://coinness.com/" -H "Accept: application/json" "https://api.coinness.com/feed/v1/breaking-news?languageCode=ko&limit=20" | head -c 300; echo
