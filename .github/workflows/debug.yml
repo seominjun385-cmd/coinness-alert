@@ -2,24 +2,19 @@ name: debug
 on:
   push:
     paths: [".github/workflows/debug.yml"]
+permissions:
+  contents: write
 jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
       - run: |
           UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36"
-          Q=$(python3 -c "import urllib.parse;print(urllib.parse.quote('앤트로픽'))")
-          curl -sS -A "$UA" -o pc.html -w "%{http_code} %{size_download}" "https://search.naver.com/search.naver?where=news&query=$Q&sort=1" > pc.txt
-          curl -sS -A "$UA" -o m.html -w "%{http_code} %{size_download}" "https://m.search.naver.com/search.naver?where=m_news&query=$Q&sort=1" > m.txt
-          echo "::notice title=pc::$(cat pc.txt) links=$(grep -oE 'https://n\.news\.naver\.com/mnews/article/[0-9]+/[0-9]+' pc.html | sort -u | wc -l) newstit=$(grep -c 'news_tit' pc.html)"
-          echo "::notice title=m::$(cat m.txt) links=$(grep -oE 'https://n\.news\.naver\.com/mnews/article/[0-9]+/[0-9]+' m.html | sort -u | wc -l)"
-          python3 - <<'PY'
-          import re
-          h=open("pc.html",encoding="utf-8",errors="ignore").read()
-          # 제목 후보: 기사 링크 주변 텍스트
-          for m in list(re.finditer(r'<a[^>]+href="(https?://[^"]+)"[^>]*>(.{5,200}?)</a>', h))[:400]:
-              t=re.sub(r"<[^>]+>","",m.group(2)).strip()
-              if ("앤트로픽" in t or "Anthropic" in t) and len(t)>10:
-                  print("::notice title=item::"+t[:120]+" | "+m.group(1)[:150])
-          i=h.find("앤트로픽"); print("::notice title=ctx::"+re.sub(r"\s+"," ",h[max(0,i-600):i+200]).replace("\n"," ")[:900])
-          PY
+          mkdir out && cd out
+          for w in 앤트로픽 클로드; do
+            Q=$(python3 -c "import urllib.parse,sys;print(urllib.parse.quote(sys.argv[1]))" "$w")
+            curl -sS -A "$UA" -o "pc_$w.html" "https://search.naver.com/search.naver?where=news&query=$Q&sort=1"
+          done
+          git init -q && git checkout -q -b debug-out && git add -A
+          git -c user.name=bot -c user.email=bot@x commit -qm out
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" debug-out
