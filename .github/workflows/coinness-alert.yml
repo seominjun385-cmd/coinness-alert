@@ -23,7 +23,9 @@ jobs:
       - name: 이미 본 소식 목록 불러오기
         uses: actions/cache/restore@v4
         with:
-          path: coinness_seen.json
+          path: |
+            coinness_seen.json
+            naver_seen.json
           key: coinness-seen-${{ github.run_id }}
           restore-keys: coinness-seen-
 
@@ -38,5 +40,7 @@ jobs:
         if: always()
         uses: actions/cache/save@v4
         with:
-          path: coinness_seen.json
+          path: |
+            coinness_seen.json
+            naver_seen.json
           key: coinness-seen-${{ github.run_id }}

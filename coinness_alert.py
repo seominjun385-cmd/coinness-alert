@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""코인니스 속보 중 관심 코인 / 상장폐지 소식만 골라 휴대폰으로 알림을 보냅니다.
+"""코인니스 속보 중 관심 코인 / 상장폐지 소식과
+네이버 뉴스의 Claude AI / Anthropic 소식만 골라 휴대폰으로 알림을 보냅니다.
 
 알림 채널 (환경변수로 설정, 둘 다 설정하면 둘 다 보냄)
   NTFY_TOPIC          ntfy 앱에서 구독할 토픽 이름 (예: coinness-pro-8f3k2)
@@ -20,8 +21,11 @@ import time
 import urllib.request
 from datetime import datetime, timedelta, timezone
 
+import naver_news
+
 API_URL = "https://api.coinness.com/feed/v1/breaking-news?languageCode=ko&limit=30"
 STATE_FILE = os.environ.get("STATE_FILE", "coinness_seen.json")
+NAVER_STATE_FILE = os.environ.get("NAVER_STATE_FILE", "naver_seen.json")
 POLL_SECONDS = 60
 # 상태 파일이 없을 때(첫 실행) 이 시간 이내 속보만 알림 (옛날 소식 폭탄 방지)
 FIRST_RUN_WINDOW = timedelta(minutes=int(os.environ.get("FIRST_RUN_MINUTES", "15")))
@@ -93,17 +97,26 @@ def post(url, payload):
 
 def notify(item, reasons):
     title = f"[{', '.join(reasons)}] {item.get('title') or ''}".strip()
-    body = (item.get("content") or "").strip()
+    link = f"https://coinness.com/news/{item['id']}"
+    send(title, item.get("content") or "", link, 5 if "상장폐지" in reasons else 4)
+
+
+def notify_naver(item):
+    body = f"{item['press']} · {item['content']}" if item["press"] else item["content"]
+    send(f"[Claude/Anthropic] {item['title']}", body, item["url"], 3)
+
+
+def send(title, body, link, priority):
+    body = body.strip()
     if len(body) > 700:
         body = body[:700] + "…"
-    link = f"https://coinness.com/news/{item['id']}"
 
     topic = os.environ.get("NTFY_TOPIC")
     if topic:
         server = os.environ.get("NTFY_SERVER", "https://ntfy.sh")
         post(server, {
             "topic": topic, "title": title[:250], "message": body or title,
-            "click": link, "priority": 5 if "상장폐지" in reasons else 4,
+            "click": link, "priority": priority,
         })
 
     token, chat = os.environ.get("TELEGRAM_BOT_TOKEN"), os.environ.get("TELEGRAM_CHAT_ID")
@@ -114,17 +127,17 @@ def notify(item, reasons):
         })
 
 
-def load_seen():
+def load_json(path):
     try:
-        with open(STATE_FILE) as f:
-            return set(json.load(f))
+        with open(path) as f:
+            return json.load(f)
     except (FileNotFoundError, ValueError):
         return None
 
 
-def save_seen(seen):
-    with open(STATE_FILE, "w") as f:
-        json.dump(sorted(seen)[-500:], f)
+def save_json(path, data):
+    with open(path, "w") as f:
+        json.dump(data, f, ensure_ascii=False)
 
 
 def check(seen, dry_run=False):
@@ -157,25 +170,35 @@ def main():
     args = set(sys.argv[1:])
     if "--test" in args:
         check(None, dry_run=True)
+        naver_news.check(None, notify_naver, dry_run=True)
         return
     if not (os.environ.get("NTFY_TOPIC") or os.environ.get("TELEGRAM_BOT_TOKEN")):
         sys.exit("NTFY_TOPIC 또는 TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID 환경변수를 설정하세요.")
     if "--ping" in args:
         notify({"id": "", "title": "코인니스 알림 연결 완료",
-                "content": "이 알림이 보이면 설정이 끝난 거예요. 앞으로 관심 코인과 상장폐지 속보만 옵니다."}, ["테스트"])
+                "content": "이 알림이 보이면 설정이 끝난 거예요. 앞으로 관심 코인·상장폐지 속보와 Claude/Anthropic 뉴스만 옵니다."}, ["테스트"])
         return
 
-    seen = load_seen()
+    seen = load_json(STATE_FILE)
+    seen = None if seen is None else set(seen)
+    naver_state = load_json(NAVER_STATE_FILE)
     while True:
+        failed = False
+        # 한쪽이 실패해도 다른 쪽은 계속 확인
         try:
             seen = check(seen)
-            save_seen(seen)
+            save_json(STATE_FILE, sorted(seen)[-500:])
         except Exception as e:
-            print(f"확인 실패: {e}", file=sys.stderr)
-            if "--once" in args:
-                sys.exit(1)  # 스케줄러에서 실패로 표시되도록
+            print(f"코인니스 확인 실패: {e}", file=sys.stderr)
+            failed = True
+        try:
+            naver_state = naver_news.check(naver_state, notify_naver)
+            save_json(NAVER_STATE_FILE, naver_state)
+        except Exception as e:
+            print(f"네이버 뉴스 확인 실패: {e}", file=sys.stderr)
+            failed = True
         if "--once" in args:
-            break
+            sys.exit(1 if failed else 0)  # 스케줄러에서 실패로 표시되도록
         time.sleep(POLL_SECONDS)
 
 
